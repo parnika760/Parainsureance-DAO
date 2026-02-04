@@ -373,13 +373,13 @@ User Action                    Component          Service              Contract
      │                            │                  │◀────TX Hash────────┤
      │                            │◀────────────────┤                    │
      │                            │                  │                    │
-     │                    ┌─────────▼────────┐      │                    │
-     │                    │ Log Transaction  │      │                    │
-     │                    │ Update UI        │      │                    │
-     │                    │ Show Confirmation│      │                    │
-     │                    └──────────────────┘      │                    │
-     │                            │                  │                    │
-     └─────────────────────────────┘                  │                    │
+     │                    ┌─────────▼────────┐       │                    │
+     │                    │ Log Transaction  │       │                    │
+     │                    │ Update UI        │       │                    │
+     │                    │ Show Confirmation│       │                    │
+     │                    └──────────────────┘       │                    │
+     │                             |                 │                    │
+     └─────────────────────────────┘                 │                    │
           "Policy Purchased!"                        │                    │
                                                      │                    │
 ```
@@ -388,7 +388,7 @@ User Action                    Component          Service              Contract
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│         Local Storage (Persistent)                   │
+│         Local Storage (Persistent)                  │
 ├─────────────────────────────────────────────────────┤
 │                                                      │
 │ localStorage.insurance_transactions = JSON.stringify([
@@ -403,13 +403,13 @@ User Action                    Component          Service              Contract
 │   },
 │   ... more transactions
 │ ])
-│                                                      │
+│                                                     │
 └─────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────┐
-│         Memory State (Volatile)                      │
+│         Memory State (Volatile)                     │
 ├─────────────────────────────────────────────────────┤
-│                                                      │
+│                                                     │
 │ Web3Context:
 │   - account: "0x123..."
 │   - provider: BrowserProvider

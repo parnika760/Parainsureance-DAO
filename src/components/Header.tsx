@@ -49,6 +49,14 @@ export const Header = () => {
             Policies
           </Link>
           <Link
+            to="/governance"
+            className={`transition ${
+              isActive('/governance') ? 'text-emerald-400 font-semibold' : 'text-gray-300 hover:text-emerald-400'
+            }`}
+          >
+            Governance
+          </Link>
+          <Link
             to="/docs"
             className={`transition ${
               isActive('/docs') ? 'text-emerald-400 font-semibold' : 'text-gray-300 hover:text-emerald-400'
@@ -56,9 +64,6 @@ export const Header = () => {
           >
             Docs
           </Link>
-          <a href="#governance" className="text-gray-300 hover:text-emerald-400 transition">
-            Governance
-          </a>
         </nav>
 
         {/* Connect Wallet Button */}
@@ -113,6 +118,15 @@ export const Header = () => {
             Policies
           </Link>
           <Link
+            to="/governance"
+            onClick={() => setMobileMenuOpen(false)}
+            className={`transition ${
+              isActive('/governance') ? 'text-emerald-400 font-semibold' : 'text-gray-300 hover:text-emerald-400'
+            }`}
+          >
+            Governance
+          </Link>
+          <Link
             to="/docs"
             onClick={() => setMobileMenuOpen(false)}
             className={`transition ${
@@ -121,9 +135,6 @@ export const Header = () => {
           >
             Docs
           </Link>
-          <a href="#governance" className="text-gray-300 hover:text-emerald-400 transition">
-            Governance
-          </a>
         </nav>
       )}
     </header>
