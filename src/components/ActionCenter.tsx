@@ -1,9 +1,11 @@
-import { ShoppingCart, AlertTriangle, DollarSign, CheckCircle, Clock } from 'lucide-react';
+import { ShoppingCart, AlertTriangle, DollarSign, CheckCircle, Clock, Zap } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { contractService } from '../services/contractService';
 import { oracleService } from '../services/oracleService';
 import { transactionService } from '../services/transactionService';
+import { LocationContext } from './StatsOverview';
+import { aiPremiumService, PremiumCalculationResult } from '../services/aiPremiumService';
 
 interface ClaimInfo {
   id: string;
@@ -13,15 +15,71 @@ interface ClaimInfo {
   status: 'claimed' | 'pending';
 }
 
+const WEATHER_TYPES = [
+  { value: 'Drought', label: '🏜️ Drought' },
+  { value: 'ExcessiveRainfall', label: '🌧️ Excessive Rainfall' },
+  { value: 'HeatWave', label: '🌡️ Heat Wave' },
+  { value: 'Hailstorm', label: '🌨️ Hailstorm' },
+  { value: 'Frost', label: '❄️ Frost' },
+  { value: 'MultiHazard', label: '⚡ Multi-Hazard' },
+];
+
 export const ActionCenter = () => {
   const { isConnected } = useWeb3();
   const [policyLoading, setPolicyLoading] = useState(false);
   const [payoutLoading, setPayoutLoading] = useState(false);
-  const [location, setLocation] = useState('Sepolia Farm');
+  const [location, setLocation] = useState('');
+  const [weatherType, setWeatherType] = useState('Drought');
   const [policyActive, setPolicyActive] = useState(false);
   const [fundAmount, setFundAmount] = useState('0.5');
   const [claimedPolicies, setClaimedPolicies] = useState<ClaimInfo[]>([]);
   const [pendingClaims, setPendingClaims] = useState<ClaimInfo[]>([]);
+  
+  // AI Premium state
+  const [quote, setQuote] = useState<PremiumCalculationResult | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
+
+  // Subscribe to location changes from StatsOverview
+  useEffect(() => {
+    const unsubscribe = LocationContext.subscribe((newLocation, newQuote) => {
+      setLocation(newLocation);
+      if (newQuote) {
+        // Recalculate with selected weather type
+        const updatedQuote = aiPremiumService.calculatePremium({
+          location: newLocation,
+          weatherType: weatherType,
+          baselineAmount: '0.01',
+        });
+        setQuote(updatedQuote);
+      } else {
+        setQuote(null);
+      }
+    });
+    
+    return unsubscribe;
+  }, [weatherType]);
+
+  // Recalculate when weather type changes
+  useEffect(() => {
+    if (location.trim().length >= 3) {
+      setIsCalculating(true);
+      const timeout = setTimeout(() => {
+        try {
+          const result = aiPremiumService.calculatePremium({
+            location: location,
+            weatherType: weatherType,
+            baselineAmount: '0.01',
+          });
+          setQuote(result);
+        } catch (error) {
+          console.error('Error calculating premium:', error);
+        } finally {
+          setIsCalculating(false);
+        }
+      }, 200);
+      return () => clearTimeout(timeout);
+    }
+  }, [weatherType, location]);
 
   // Load real claims when wallet connects
   useEffect(() => {
@@ -226,22 +284,84 @@ export const ActionCenter = () => {
         </p>
 
         <div className="space-y-4 mb-6">
+          {/* Location Display - entered from top card */}
           <div>
             <label className="block text-sm font-semibold mb-2 text-gray-300">Farm Location</label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              disabled={policyActive}
-              className="w-full bg-dark-800 border border-emerald-400 border-opacity-30 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400"
-              placeholder="e.g., Sepolia Farm"
-            />
+            <div className="w-full bg-dark-800 border border-emerald-400 border-opacity-30 rounded-lg px-4 py-2 text-white">
+              {location ? (
+                <span className="flex items-center gap-2">
+                  <span className="text-emerald-400">📍</span> {location}
+                </span>
+              ) : (
+                <span className="text-gray-500">← Enter location in card above</span>
+              )}
+            </div>
           </div>
 
+          {/* Weather Type Selector */}
+          <div>
+            <label className="block text-sm font-semibold mb-2 text-gray-300">Coverage Type</label>
+            <select
+              value={weatherType}
+              onChange={(e) => setWeatherType(e.target.value)}
+              disabled={policyActive}
+              className="w-full bg-dark-800 border border-emerald-400 border-opacity-30 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-emerald-400"
+            >
+              {WEATHER_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* AI-Calculated Premium Display */}
           <div className="bg-dark-800 border border-emerald-400 border-opacity-30 rounded-lg p-4">
-            <p className="stat-label">Premium Cost</p>
-            <p className="text-2xl font-bold text-emerald-400 mt-2">0.01 ETH</p>
-            <p className="text-xs text-gray-400 mt-2">One-time premium for annual coverage</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="stat-label">AI-Calculated Premium</p>
+              {isCalculating && <span className="text-xs text-emerald-400 animate-pulse">🔄 Calculating...</span>}
+            </div>
+            
+            {quote ? (
+              <>
+                <p className="text-2xl font-bold text-emerald-400 mt-2">
+                  {(parseInt(quote.finalPremium) / 1e18).toFixed(4)} ETH
+                </p>
+                <div className="mt-3 space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Base Premium:</span>
+                    <span className="text-white">{quote.basePremium} ETH</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">Risk Multiplier:</span>
+                    <span className="text-emerald-400 font-semibold">{quote.riskMultiplier}x</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-400">AI Confidence:</span>
+                    <span className="text-blue-400">{quote.confidence.toFixed(0)}%</span>
+                  </div>
+                </div>
+                
+                {/* Risk Factors */}
+                {quote.riskFactors.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-gray-700">
+                    <p className="text-xs text-gray-400 mb-2">Risk Factors:</p>
+                    <div className="flex flex-wrap gap-1">
+                      {quote.riskFactors.map((factor, idx) => (
+                        <span key={idx} className="text-xs bg-yellow-500 bg-opacity-20 text-yellow-400 px-2 py-1 rounded">
+                          ⚡ {factor}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-bold text-gray-500 mt-2">— ETH</p>
+                <p className="text-xs text-gray-400 mt-2">Enter location above to calculate premium</p>
+              </>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -251,7 +371,9 @@ export const ActionCenter = () => {
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-400">Max Payout</span>
-              <span className="text-white font-semibold">0.01 ETH</span>
+              <span className="text-white font-semibold">
+                {quote ? `${(parseInt(quote.finalPremium) / 1e18 * 2).toFixed(4)} ETH` : '— ETH'}
+              </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-400">Status</span>
@@ -264,7 +386,7 @@ export const ActionCenter = () => {
 
         <button
           onClick={handleBuyPolicy}
-          disabled={policyLoading || !isConnected || policyActive}
+          disabled={policyLoading || !isConnected || policyActive || !quote}
           className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {policyLoading ? (
@@ -273,8 +395,10 @@ export const ActionCenter = () => {
             </span>
           ) : policyActive ? (
             '✓ Policy Active'
+          ) : !quote ? (
+            '📍 Enter Location First'
           ) : (
-            '🛡️ Purchase Policy'
+            `🛡️ Purchase Policy (${(parseInt(quote.finalPremium) / 1e18).toFixed(4)} ETH)`
           )}
         </button>
       </div>

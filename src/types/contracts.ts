@@ -7,6 +7,10 @@ export interface PolicyData {
   lastReportedRainfall: number;
   premiumAmount: string;
   payoutAmount: string;
+  location?: string;
+  weatherType?: string;
+  purchaseTime?: number;
+  claimTime?: number;
 }
 
 export interface WeatherData {
@@ -33,10 +37,47 @@ export interface ContractConfig {
 
 export interface TransactionLog {
   id: string;
-  type: 'PolicyBought' | 'PayoutTriggered' | 'WeatherReported' | 'FundsDeposited';
+  type: 'PolicyBought' | 'PayoutTriggered' | 'WeatherReported' | 'FundsDeposited' | 'LocationVerified';
   timestamp: number;
   status: 'pending' | 'confirmed' | 'failed';
   amount?: string;
   txHash?: string;
   description: string;
+  location?: string;
+}
+
+// Insurance-specific types
+export interface InsurancePolicy {
+  farmer: string;
+  location: string;
+  weatherType: 'ExcessiveRainfall' | 'HeatWave' | 'Hailstorm' | 'Drought' | 'Frost' | 'MultiHazard';
+  premiumPaid: string;
+  payoutAmount: string;
+  active: boolean;
+  paid: boolean;
+  purchaseTime: number;
+  claimTime: number;
+}
+
+export interface PremiumQuote {
+  location: string;
+  weatherType: string;
+  basePremium: string;
+  riskMultiplier: number;
+  finalPremium: string;
+  riskFactors: string[];
+  confidence: number;
+}
+
+export interface ClaimRequest {
+  farmer: string;
+  location: string;
+  weatherType: string;
+  timestamp: number;
+  weatherData: {
+    rainfall?: number;
+    temperature?: number;
+    windSpeed?: number;
+    frostDetected?: boolean;
+  };
 }

@@ -28,6 +28,25 @@ const INSURANCE_CONTRACT_ABI = [
   'event PayoutTriggered(address indexed farmer, uint256 amount)',
 ];
 
+// Enhanced Farmer Insurance ABI
+const FARMER_INSURANCE_ABI = [
+  'function purchasePolicy(string calldata location, uint8 weatherType) external payable',
+  'function fulfillWeatherData(address farmer, string calldata reportedLocation, uint256 rainfall, int256 temperature, uint256 windSpeed, bool frostDetected) external',
+  'function verifyClaimLocation(address farmer, string calldata claimLocation) external view returns (bool)',
+  'function getPolicy(address farmer) external view returns (tuple(address farmer, string location, uint8 weatherType, uint256 premiumPaid, uint256 payoutAmount, bool active, bool paid, uint256 purchaseTime, uint256 claimTime))',
+  'function getPoliciesByLocation(string calldata location) external view returns (address[])',
+  'function getLocationPolicyCount(string calldata location) external view returns (uint256)',
+  'function getFarmerTotalPayouts(address farmer) external view returns (uint256)',
+  'function getContractStats() external view returns (uint256 premiumsCollected, uint256 payoutsExecuted, uint256 contractBalance)',
+  'function updateOracle(address newOracle) external',
+  'function withdrawContractBalance() external',
+  'event PolicyPurchased(address indexed farmer, string location, uint8 weatherType, uint256 premium, uint256 payoutAmount)',
+  'event WeatherEvaluated(address indexed farmer, string location, uint256 rainfall, int256 temperature, uint256 windSpeed, bool frostDetected)',
+  'event PayoutExecuted(address indexed farmer, string location, uint256 payoutAmount)',
+  'event LocationClaimVerified(address indexed farmer, string location, bool verified)',
+  'event OracleUpdated(address newOracle)',
+];
+
 // Chainlink AggregatorV3Interface ABI
 const AGGREGATOR_ABI = [
   'function decimals() external view returns (uint8)',
@@ -252,6 +271,251 @@ export class ContractService {
       return Number(threshold);
     } catch (error) {
       console.error('Error fetching rain threshold:', error);
+      throw error;
+    }
+  }
+
+  // ================= FARMER INSURANCE METHODS =================
+
+  /**
+   * Purchase a farmer insurance policy with AI-calculated premium
+   */
+  async purchasePolicy(
+    location: string,
+    weatherType: string,
+    premiumWei: string,
+    signer: ethers.Signer
+  ): Promise<string> {
+    try {
+      const contract = new ethers.Contract(
+        this.contractAddress,
+        FARMER_INSURANCE_ABI,
+        signer
+      );
+
+      // Map weather type string to enum
+      const weatherTypeMap: Record<string, number> = {
+        'ExcessiveRainfall': 0,
+        'HeatWave': 1,
+        'Hailstorm': 2,
+        'Drought': 3,
+        'Frost': 4,
+        'MultiHazard': 5,
+      };
+
+      const weatherTypeIndex = weatherTypeMap[weatherType] || 3; // Default to Drought
+
+      const tx = await contract.purchasePolicy(location, weatherTypeIndex, {
+        value: premiumWei,
+        gasLimit: 300000,
+      });
+
+      const receipt = await tx.wait();
+      if (!receipt) {
+        throw new Error('Transaction failed');
+      }
+
+      return receipt.transactionHash;
+    } catch (error: any) {
+      console.error('Error purchasing policy:', error);
+      
+      if (error.message?.includes('Policy already active')) {
+        throw new Error('You already have an active policy. Complete or cancel the existing one first.');
+      } else if (error.message?.includes('Invalid location')) {
+        throw new Error('Invalid location provided');
+      } else if (error.code === 'INSUFFICIENT_FUNDS') {
+        throw new Error('Insufficient ETH balance for premium and gas');
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Get policy details for a farmer
+   */
+  async getPolicy(
+    farmerAddress: string,
+    signer: ethers.Signer
+  ): Promise<any> {
+    try {
+      const contract = new ethers.Contract(
+        this.contractAddress,
+        FARMER_INSURANCE_ABI,
+        signer
+      );
+
+      const policy = await contract.getPolicy(farmerAddress);
+
+      return {
+        farmer: policy[0],
+        location: policy[1],
+        weatherType: ['ExcessiveRainfall', 'HeatWave', 'Hailstorm', 'Drought', 'Frost', 'MultiHazard'][Number(policy[2])],
+        premiumPaid: policy[3],
+        payoutAmount: policy[4],
+        active: policy[5],
+        paid: policy[6],
+        purchaseTime: Number(policy[7]),
+        claimTime: Number(policy[8]),
+      };
+    } catch (error) {
+      console.error('Error fetching policy:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Verify that a claim location matches the policy location
+   */
+  async verifyClaimLocation(
+    farmerAddress: string,
+    claimLocation: string,
+    signer: ethers.Signer
+  ): Promise<boolean> {
+    try {
+      const contract = new ethers.Contract(
+        this.contractAddress,
+        FARMER_INSURANCE_ABI,
+        signer
+      );
+
+      return await contract.verifyClaimLocation(farmerAddress, claimLocation);
+    } catch (error) {
+      console.error('Error verifying claim location:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get all policies for a specific location
+   */
+  async getPoliciesByLocation(
+    location: string,
+    signer: ethers.Signer
+  ): Promise<string[]> {
+    try {
+      const contract = new ethers.Contract(
+        this.contractAddress,
+        FARMER_INSURANCE_ABI,
+        signer
+      );
+
+      return await contract.getPoliciesByLocation(location);
+    } catch (error) {
+      console.error('Error fetching policies by location:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get location policy count
+   */
+  async getLocationPolicyCount(
+    location: string,
+    signer: ethers.Signer
+  ): Promise<number> {
+    try {
+      const contract = new ethers.Contract(
+        this.contractAddress,
+        FARMER_INSURANCE_ABI,
+        signer
+      );
+
+      const count = await contract.getLocationPolicyCount(location);
+      return Number(count);
+    } catch (error) {
+      console.error('Error fetching location policy count:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get total payouts for a farmer
+   */
+  async getFarmerTotalPayouts(
+    farmerAddress: string,
+    signer: ethers.Signer
+  ): Promise<string> {
+    try {
+      const contract = new ethers.Contract(
+        this.contractAddress,
+        FARMER_INSURANCE_ABI,
+        signer
+      );
+
+      const payouts = await contract.getFarmerTotalPayouts(farmerAddress);
+      return ethers.formatEther(payouts);
+    } catch (error) {
+      console.error('Error fetching farmer payouts:', error);
+      return '0';
+    }
+  }
+
+  /**
+   * Get contract statistics
+   */
+  async getContractStats(signer: ethers.Signer): Promise<{
+    premiumsCollected: string;
+    payoutsExecuted: string;
+    contractBalance: string;
+  }> {
+    try {
+      const contract = new ethers.Contract(
+        this.contractAddress,
+        FARMER_INSURANCE_ABI,
+        signer
+      );
+
+      const [premiumsCollected, payoutsExecuted, contractBalance] = await contract.getContractStats();
+
+      return {
+        premiumsCollected: ethers.formatEther(premiumsCollected),
+        payoutsExecuted: ethers.formatEther(payoutsExecuted),
+        contractBalance: ethers.formatEther(contractBalance),
+      };
+    } catch (error) {
+      console.error('Error fetching contract stats:', error);
+      return {
+        premiumsCollected: '0',
+        payoutsExecuted: '0',
+        contractBalance: '0',
+      };
+    }
+  }
+
+  /**
+   * Fulfill weather data with location verification (Oracle function)
+   */
+  async fulfillWeatherData(
+    farmer: string,
+    location: string,
+    rainfall: number,
+    temperature: number,
+    windSpeed: number,
+    frostDetected: boolean,
+    signer: ethers.Signer
+  ): Promise<string> {
+    try {
+      const contract = new ethers.Contract(
+        this.contractAddress,
+        FARMER_INSURANCE_ABI,
+        signer
+      );
+
+      const tx = await contract.fulfillWeatherData(
+        farmer,
+        location,
+        rainfall,
+        temperature,
+        windSpeed,
+        frostDetected,
+        { gasLimit: 500000 }
+      );
+
+      const receipt = await tx.wait();
+      return receipt?.transactionHash || '';
+    } catch (error) {
+      console.error('Error fulfilling weather data:', error);
       throw error;
     }
   }
