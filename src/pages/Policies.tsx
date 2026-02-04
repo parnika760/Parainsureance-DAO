@@ -60,6 +60,30 @@ export const Policies = () => {
     }
   }, [isConnected, account]);
 
+  // Refresh policies when the page becomes visible (user navigates back)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isConnected) {
+        loadPurchasedPolicies();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Also refresh on focus
+    const handleFocus = () => {
+      if (isConnected) {
+        loadPurchasedPolicies();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isConnected]);
+
   const loadPurchasedPolicies = () => {
     try {
       setIsLoadingPolicies(true);
@@ -67,19 +91,27 @@ export const Policies = () => {
       const policyTransactions = transactionService.getTransactionsByType('PolicyBought');
       
       if (policyTransactions.length > 0) {
-        const policies: UserPolicy[] = policyTransactions.map((tx, index) => ({
-          id: `#${8821 + index}`,
-          type: 'Weather Protection Policy',
-          coverage: '0.01 ETH',
-          duration: Math.floor(Math.random() * 100),
-          status: tx.status === 'confirmed' ? 'Active & Monitoring' : 'Pending',
-          startDate: new Date(tx.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-          endDate: new Date(tx.timestamp + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
-          txHash: tx.txHash,
-          amount: tx.amount
-        }));
+        const policies: UserPolicy[] = policyTransactions
+          .filter(tx => tx.status === 'confirmed')
+          .map((tx, index) => {
+            // Extract location from description like "Policy purchase for Mumbai, Maharashtra"
+            const locationMatch = tx.description?.match(/for (.+)$/);
+            const location = locationMatch ? locationMatch[1] : 'Farm Location';
+            
+            return {
+              id: `#${8821 + index}`,
+              type: `Weather Protection - ${location}`,
+              coverage: `${(parseFloat(tx.amount || '0.01') * 2).toFixed(2)} ETH`,
+              duration: 365,
+              status: 'Active & Monitoring',
+              startDate: new Date(tx.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+              endDate: new Date(tx.timestamp + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+              txHash: tx.txHash,
+              amount: tx.amount
+            };
+          });
         setActivePolicies(policies);
-        setHasPolicy(true);
+        setHasPolicy(policies.length > 0);
       } else {
         setActivePolicies([]);
         setHasPolicy(false);

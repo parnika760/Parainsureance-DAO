@@ -72,7 +72,7 @@
 - [x] Error handling and validation
 
 ### Smart Contract Integration
-- [x] Insurance contract (0x5Cea979df129614c09C6E7AA45b568B37b740726)
+- [x] Insurance contract (0xE529a659d1de4025A4044E6472C26B6224dADCb4)
 - [x] Chainlink ETH/USD feed (0x694AA1769357215DE4FAC081bf1f309aDC325306)
 - [x] Policy purchase function
 - [x] Weather fulfillment function

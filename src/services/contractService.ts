@@ -523,5 +523,5 @@ export class ContractService {
 
 // Export singleton instance
 export const contractService = new ContractService(
-  '0x5Cea979df129614c09C6E7AA45b568B37b740726'
+  '0xE529a659d1de4025A4044E6472C26B6224dADCb4'
 );

@@ -202,7 +202,7 @@ contract Insurance {
 ```
 
 **Network**: Sepolia Testnet  
-**Address**: `0x5Cea979df129614c09C6E7AA45b568B37b740726`  
+**Address**: `0xE529a659d1de4025A4044E6472C26B6224dADCb4`  
 **Status**: ✅ DEPLOYED AND ACTIVE
 
 ---
@@ -424,7 +424,7 @@ Common contract errors:
 ## Contract Verification
 
 **Sepolia Etherscan**:
-- Address: `0x5Cea979df129614c09C6E7AA45b568B37b740726`
+- Address: `0xE529a659d1de4025A4044E6472C26B6224dADCb4`
 - Network: Sepolia
 - Status: Verified ✅
 

@@ -94,7 +94,7 @@ Successfully integrated comprehensive smart contract backend with the ParaShield
 ## Key Features Implemented
 
 ### 1. Smart Contract Integration ✅
-- Direct interaction with Insurance contract (0x5Cea979df129614c09C6E7AA45b568B37b740726)
+- Direct interaction with Insurance contract (0xE529a659d1de4025A4044E6472C26B6224dADCb4)
 - Chainlink oracle integration for ETH/USD pricing
 - All contract functions callable from frontend:
   - requestPolicy() - Purchase insurance
@@ -140,7 +140,7 @@ Successfully integrated comprehensive smart contract backend with the ParaShield
 
 ### Smart Contract Addresses (Sepolia)
 ```typescript
-INSURANCE_CONTRACT: "0x5Cea979df129614c09C6E7AA45b568B37b740726"
+INSURANCE_CONTRACT: "0xE529a659d1de4025A4044E6472C26B6224dADCb4"
 CHAINLINK_ETH_USD_FEED: "0x694AA1769357215DE4FAC081bf1f309aDC325306"
 ```
 

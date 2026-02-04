@@ -1,8 +1,50 @@
-import { MapPin, TrendingUp, Activity } from 'lucide-react';
-import { useEffect, useState, useCallback } from 'react';
+import { MapPin, TrendingUp, Activity, ChevronDown } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useWeb3 } from '../context/Web3Context';
 import { contractService } from '../services/contractService';
 import { aiPremiumService, PremiumCalculationResult } from '../services/aiPremiumService';
+
+// All Indian Cities organized by category
+const INDIAN_CITIES = {
+  'States': [
+    'Punjab', 'Haryana', 'Uttar Pradesh', 'Uttarakhand', 'Himachal Pradesh',
+    'Jammu & Kashmir', 'Ladakh', 'Delhi', 'Rajasthan', 'Gujarat', 'Maharashtra',
+    'Goa', 'West Bengal', 'Bihar', 'Jharkhand', 'Odisha', 'Andhra Pradesh',
+    'Telangana', 'Karnataka', 'Tamil Nadu', 'Kerala', 'Madhya Pradesh',
+    'Chhattisgarh', 'Assam', 'Meghalaya', 'Arunachal Pradesh', 'Nagaland',
+    'Manipur', 'Mizoram', 'Tripura', 'Sikkim'
+  ],
+  'Tier 1 Cities': [
+    'Mumbai, Maharashtra', 'Delhi', 'Bengaluru, Karnataka', 'Hyderabad, Telangana',
+    'Chennai, Tamil Nadu', 'Kolkata, West Bengal', 'Ahmedabad, Gujarat', 'Pune, Maharashtra'
+  ],
+  'Tier 2 Cities': [
+    'Jaipur, Rajasthan', 'Lucknow, UP', 'Kanpur, UP', 'Nagpur, Maharashtra',
+    'Indore, MP', 'Bhopal, MP', 'Patna, Bihar', 'Vadodara, Gujarat',
+    'Surat, Gujarat', 'Ludhiana, Punjab', 'Agra, UP', 'Nashik, Maharashtra',
+    'Varanasi, UP', 'Meerut, UP', 'Rajkot, Gujarat', 'Visakhapatnam, AP',
+    'Coimbatore, Tamil Nadu', 'Madurai, Tamil Nadu', 'Kochi, Kerala',
+    'Thiruvananthapuram, Kerala', 'Guwahati, Assam', 'Chandigarh',
+    'Mysuru, Karnataka', 'Vijayawada, AP', 'Jodhpur, Rajasthan'
+  ],
+  'Tier 3 Cities': [
+    'Amritsar, Punjab', 'Jalandhar, Punjab', 'Patiala, Punjab', 'Bathinda, Punjab',
+    'Gurugram, Haryana', 'Faridabad, Haryana', 'Hisar, Haryana', 'Karnal, Haryana',
+    'Prayagraj, UP', 'Gorakhpur, UP', 'Udaipur, Rajasthan', 'Kota, Rajasthan',
+    'Bikaner, Rajasthan', 'Jaisalmer, Rajasthan', 'Aurangabad, Maharashtra',
+    'Solapur, Maharashtra', 'Kolhapur, Maharashtra', 'Bhavnagar, Gujarat',
+    'Kutch, Gujarat', 'Jabalpur, MP', 'Gwalior, MP', 'Gaya, Bihar',
+    'Muzaffarpur, Bihar', 'Siliguri, West Bengal', 'Durgapur, West Bengal',
+    'Hubli, Karnataka', 'Shillong, Meghalaya', 'Imphal, Manipur',
+    'Agartala, Tripura', 'Gangtok, Sikkim'
+  ],
+  'Agricultural Regions': [
+    'Vidarbha, Maharashtra', 'Marathwada, Maharashtra', 'Bundelkhand, UP/MP',
+    'Malwa, MP', 'Doab Region, UP', 'Terai Region', 'Konkan, Maharashtra',
+    'Cauvery Delta, TN', 'Sundarbans, WB'
+  ]
+};
 
 interface StatsCardProps {
   icon: React.ReactNode;
@@ -66,15 +108,30 @@ export const StatsOverview = () => {
   const [location, setLocation] = useState('');
   const [isCalculating, setIsCalculating] = useState(false);
   const [quote, setQuote] = useState<PremiumCalculationResult | null>(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
-  const availableLocations = aiPremiumService.getAvailableLocations();
+  // Update dropdown position when it opens
+  useEffect(() => {
+    if (showDropdown && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width
+      });
+    }
+  }, [showDropdown]);
+  // Get all cities flattened for search
+  const allCities = Object.values(INDIAN_CITIES).flat();
   
-  // Filter locations based on input
-  const filteredLocations = location.length >= 1
-    ? availableLocations.filter(loc => 
-        loc.toLowerCase().includes(location.toLowerCase())
-      ).slice(0, 15) // Limit to 15 suggestions
+  // Filter cities based on search
+  const filteredCities = searchTerm.length >= 1
+    ? allCities.filter(city => 
+        city.toLowerCase().includes(searchTerm.toLowerCase())
+      )
     : [];
 
   useEffect(() => {
@@ -154,54 +211,114 @@ export const StatsOverview = () => {
           </div>
         </div>
         
-        <div className="relative">
-          <input
-            type="text"
-            value={location}
-            onChange={(e) => {
-              handleLocationChange(e.target.value);
-              setShowSuggestions(true);
-            }}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-            placeholder="Search: Punjab, Rajasthan, Mumbai..."
-            className="w-full bg-dark-800 border border-emerald-400 border-opacity-30 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400 text-sm"
-          />
+        <div>
+          {/* Selected Location Display / Dropdown Trigger */}
+          <button
+            ref={buttonRef}
+            type="button"
+            onClick={() => setShowDropdown(!showDropdown)}
+            className="w-full bg-dark-800 border border-emerald-400 border-opacity-30 rounded-lg px-3 py-2 text-left text-sm flex items-center justify-between focus:outline-none focus:border-emerald-400"
+          >
+            <span className={location ? 'text-white' : 'text-gray-500'}>
+              {location || 'Select your city...'}
+            </span>
+            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+          </button>
           
-          {/* Custom Dropdown */}
-          {showSuggestions && filteredLocations.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-dark-800 border border-emerald-400 border-opacity-30 rounded-lg max-h-48 overflow-y-auto shadow-xl">
-              {filteredLocations.map((loc, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    handleLocationChange(loc);
-                    setShowSuggestions(false);
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-emerald-500 hover:bg-opacity-20 hover:text-emerald-400 transition-colors"
-                >
-                  📍 {loc}
-                </button>
-              ))}
+          {/* Dropdown Menu - Rendered as Portal */}
+          {showDropdown && createPortal(
+            <>
+              {/* Invisible backdrop */}
+              <div 
+                className="fixed inset-0"
+                style={{ zIndex: 99998 }}
+                onClick={() => setShowDropdown(false)}
+              />
+              <div 
+                className="fixed bg-dark-800 border border-emerald-400 border-opacity-50 rounded-lg shadow-2xl"
+                style={{ 
+                  zIndex: 99999, 
+                  top: dropdownPosition.top,
+                  left: dropdownPosition.left,
+                  width: dropdownPosition.width,
+                  maxHeight: '280px'
+                }}
+              >
+                {/* Search Input */}
+                <div className="p-2 border-b border-gray-700 bg-dark-800 rounded-t-lg">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search cities..."
+                    className="w-full bg-dark-900 border border-gray-600 rounded px-2 py-1.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-emerald-400"
+                    autoFocus
+                  />
+                </div>
+                
+                <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                  {searchTerm.length >= 1 ? (
+                    // Show search results
+                    filteredCities.length > 0 ? (
+                      filteredCities.slice(0, 20).map((city, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            handleLocationChange(city);
+                            setShowDropdown(false);
+                          setSearchTerm('');
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-emerald-500 hover:bg-opacity-20 hover:text-emerald-400 transition-colors"
+                      >
+                        {city}
+                      </button>
+                    ))
+                  ) : (
+                    <p className="px-3 py-2 text-sm text-gray-500">No cities found</p>
+                  )
+                ) : (
+                  // Show categorized list
+                  Object.entries(INDIAN_CITIES).map(([category, cities]) => (
+                    <div key={category}>
+                      <div className="px-3 py-2 bg-dark-900 text-xs font-semibold text-emerald-400 sticky top-0">
+                        {category} ({cities.length})
+                      </div>
+                      {cities.map((city, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            handleLocationChange(city);
+                            setShowDropdown(false);
+                            setSearchTerm('');
+                          }}
+                          className="w-full text-left px-4 py-1.5 text-sm text-gray-300 hover:bg-emerald-500 hover:bg-opacity-20 hover:text-emerald-400 transition-colors"
+                        >
+                          {city}
+                        </button>
+                      ))}
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
+            </>,
+            document.body
           )}
         </div>
         
         {isCalculating ? (
-          <p className="text-xs text-gray-400 mt-2">🔄 Calculating risk...</p>
+          <p className="text-xs text-gray-400 mt-2">Calculating risk...</p>
         ) : quote ? (
           <div className="mt-2">
             <p className="text-xs text-emerald-400">
-              ✓ Risk Multiplier: <span className="font-bold">{quote.riskMultiplier}x</span>
+              ✓ Risk Multiplier: <span className="font-bold">{quote.riskMultiplier.toFixed(2)}x</span>
             </p>
             <p className="text-xs text-gray-400">AI Confidence: {quote.confidence.toFixed(0)}%</p>
           </div>
-        ) : location.length > 0 && location.length < 3 ? (
-          <p className="text-xs text-gray-400 mt-2">Type at least 3 characters...</p>
         ) : (
-          <p className="text-xs text-gray-400 mt-2">🇮🇳 All Indian states, cities & regions</p>
+          <p className="text-xs text-gray-400 mt-2">All Indian states, cities & regions</p>
         )}
       </div>
 
@@ -220,5 +337,4 @@ export const StatsOverview = () => {
         loading={loading && isConnected}
       />
     </div>
-  );
-};
+  );};

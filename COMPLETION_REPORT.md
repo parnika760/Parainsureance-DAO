@@ -10,7 +10,7 @@ All smart contract backend has been successfully integrated with the React front
 
 ### 1. **Smart Contract Integration** ✅
 - ✅ Direct blockchain interaction via ethers.js v6
-- ✅ Insurance contract integration (0x5Cea979df129614c09C6E7AA45b568B37b740726)
+- ✅ Insurance contract integration (0xE529a659d1de4025A4044E6472C26B6224dADCb4)
 - ✅ Chainlink price feed integration (ETH/USD)
 - ✅ All contract functions callable from frontend
 - ✅ Transaction signing via MetaMask

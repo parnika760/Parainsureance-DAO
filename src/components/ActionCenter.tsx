@@ -1,4 +1,4 @@
-import { ShoppingCart, AlertTriangle, DollarSign, CheckCircle, Clock, Zap } from 'lucide-react';
+import { ShoppingCart, AlertTriangle, DollarSign, CheckCircle, Clock, Zap, Key, Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { contractService } from '../services/contractService';
@@ -6,6 +6,7 @@ import { oracleService } from '../services/oracleService';
 import { transactionService } from '../services/transactionService';
 import { LocationContext } from './StatsOverview';
 import { aiPremiumService, PremiumCalculationResult } from '../services/aiPremiumService';
+import { geminiAIService, AIRiskAssessment } from '../services/geminiAIService';
 
 interface ClaimInfo {
   id: string;
@@ -37,7 +38,12 @@ export const ActionCenter = () => {
   
   // AI Premium state
   const [quote, setQuote] = useState<PremiumCalculationResult | null>(null);
+  const [aiAssessment, setAiAssessment] = useState<AIRiskAssessment | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [useRealAI, setUseRealAI] = useState(geminiAIService.isConfigured());
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [aiError, setAiError] = useState<string | null>(null);
 
   // Subscribe to location changes from StatsOverview
   useEffect(() => {
@@ -62,24 +68,70 @@ export const ActionCenter = () => {
   // Recalculate when weather type changes
   useEffect(() => {
     if (location.trim().length >= 3) {
-      setIsCalculating(true);
-      const timeout = setTimeout(() => {
-        try {
-          const result = aiPremiumService.calculatePremium({
-            location: location,
-            weatherType: weatherType,
-            baselineAmount: '0.01',
-          });
-          setQuote(result);
-        } catch (error) {
-          console.error('Error calculating premium:', error);
-        } finally {
-          setIsCalculating(false);
-        }
-      }, 200);
-      return () => clearTimeout(timeout);
+      calculatePremium();
     }
-  }, [weatherType, location]);
+  }, [weatherType, location, useRealAI]);
+
+  const calculatePremium = async () => {
+    if (!location.trim() || location.trim().length < 3) return;
+    
+    setIsCalculating(true);
+    setAiError(null);
+    
+    try {
+      if (useRealAI && geminiAIService.isConfigured()) {
+        // Use REAL Gemini AI
+        const assessment = await geminiAIService.calculatePremium(location, weatherType);
+        setAiAssessment(assessment);
+        
+        // Convert to quote format for compatibility
+        setQuote({
+          location: assessment.location,
+          weatherType: weatherType,
+          basePremium: '0.01',
+          riskMultiplier: assessment.riskScore / 30, // Normalize
+          finalPremium: (parseFloat(assessment.recommendedPremiumETH) * 1e18).toString(),
+          riskFactors: assessment.riskFactors,
+          confidence: assessment.confidence,
+        });
+      } else {
+        // Use rule-based calculation (fallback)
+        const result = aiPremiumService.calculatePremium({
+          location: location,
+          weatherType: weatherType,
+          baselineAmount: '0.01',
+        });
+        setQuote(result);
+        setAiAssessment(null);
+      }
+    } catch (error) {
+      console.error('Error calculating premium:', error);
+      setAiError((error as Error).message);
+      // Fallback to rule-based
+      const result = aiPremiumService.calculatePremium({
+        location: location,
+        weatherType: weatherType,
+        baselineAmount: '0.01',
+      });
+      setQuote(result);
+      setAiAssessment(null);
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
+  const handleSaveApiKey = () => {
+    if (apiKeyInput.trim()) {
+      geminiAIService.setApiKey(apiKeyInput.trim());
+      setUseRealAI(true);
+      setShowApiKeyInput(false);
+      setApiKeyInput('');
+      // Recalculate with AI
+      if (location.trim().length >= 3) {
+        calculatePremium();
+      }
+    }
+  };
 
   // Load real claims when wallet connects
   useEffect(() => {
@@ -274,10 +326,58 @@ export const ActionCenter = () => {
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
       {/* Buy Policy Section */}
       <div className="glass-card">
-        <div className="flex items-center gap-3 mb-4">
-          <ShoppingCart className="w-6 h-6 text-emerald-400" />
-          <h2 className="text-xl md:text-2xl font-bold">Purchase Policy</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <ShoppingCart className="w-6 h-6 text-emerald-400" />
+            <h2 className="text-xl md:text-2xl font-bold">Purchase Policy</h2>
+          </div>
+          
+          {/* AI Mode Toggle */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+              className={`p-2 rounded-lg transition-colors ${
+                useRealAI ? 'bg-purple-500 bg-opacity-20 text-purple-400' : 'bg-gray-700 text-gray-400'
+              }`}
+              title={useRealAI ? 'Gemini AI Active' : 'Click to enable AI'}
+            >
+              <Sparkles className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
+        {/* API Key Configuration */}
+        {showApiKeyInput && (
+          <div className="mb-4 p-3 bg-purple-500 bg-opacity-10 border border-purple-500 border-opacity-30 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <Key className="w-4 h-4 text-purple-400" />
+              <span className="text-sm font-semibold text-purple-400">Gemini AI Configuration</span>
+            </div>
+            <p className="text-xs text-gray-400 mb-3">
+              Enter your Gemini API key to enable real AI-powered risk assessment. 
+              Get your free key at <a href="https://makersuite.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-purple-400 underline">Google AI Studio</a>
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                placeholder="AIzaSy..."
+                className="flex-1 bg-dark-800 border border-purple-400 border-opacity-30 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-400"
+              />
+              <button
+                onClick={handleSaveApiKey}
+                disabled={!apiKeyInput.trim()}
+                className="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
+              >
+                Save
+              </button>
+            </div>
+            {geminiAIService.isConfigured() && (
+              <p className="text-xs text-green-400 mt-2">✓ API Key configured</p>
+            )}
+          </div>
+        )}
         
         <p className="text-gray-300 mb-4">
           Protect your crops with parametric insurance. Get instant, automated payouts when disaster strikes.
@@ -318,15 +418,52 @@ export const ActionCenter = () => {
           {/* AI-Calculated Premium Display */}
           <div className="bg-dark-800 border border-emerald-400 border-opacity-30 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="stat-label">AI-Calculated Premium</p>
-              {isCalculating && <span className="text-xs text-emerald-400 animate-pulse">🔄 Calculating...</span>}
+              <div className="flex items-center gap-2">
+                <p className="stat-label">
+                  {aiAssessment ? '🤖 Gemini AI Premium' : '📊 Calculated Premium'}
+                </p>
+                {aiAssessment && (
+                  <span className="text-xs bg-purple-500 bg-opacity-20 text-purple-400 px-2 py-0.5 rounded">
+                    REAL AI
+                  </span>
+                )}
+              </div>
+              {isCalculating && <span className="text-xs text-emerald-400 animate-pulse">Analyzing...</span>}
             </div>
+            
+            {aiError && (
+              <div className="mb-2 p-2 bg-red-500 bg-opacity-10 border border-red-500 border-opacity-30 rounded text-xs text-red-400">
+                ⚠️ {aiError} - Using fallback calculation
+              </div>
+            )}
             
             {quote ? (
               <>
                 <p className="text-2xl font-bold text-emerald-400 mt-2">
-                  {(parseInt(quote.finalPremium) / 1e18).toFixed(4)} ETH
+                  {aiAssessment 
+                    ? `${aiAssessment.recommendedPremiumETH} ETH`
+                    : `${(parseInt(quote.finalPremium) / 1e18).toFixed(4)} ETH`
+                  }
                 </p>
+                
+                {/* AI Analysis */}
+                {aiAssessment && (
+                  <div className="mt-3 p-2 bg-purple-500 bg-opacity-10 rounded border border-purple-500 border-opacity-20">
+                    <p className="text-xs text-gray-300">{aiAssessment.weatherAnalysis}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className={`text-xs px-2 py-0.5 rounded ${
+                        aiAssessment.riskLevel === 'LOW' ? 'bg-green-500 bg-opacity-20 text-green-400' :
+                        aiAssessment.riskLevel === 'MEDIUM' ? 'bg-yellow-500 bg-opacity-20 text-yellow-400' :
+                        aiAssessment.riskLevel === 'HIGH' ? 'bg-orange-500 bg-opacity-20 text-orange-400' :
+                        'bg-red-500 bg-opacity-20 text-red-400'
+                      }`}>
+                        {aiAssessment.riskLevel} RISK
+                      </span>
+                      <span className="text-xs text-gray-400">Score: {aiAssessment.riskScore}/100</span>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="mt-3 space-y-1">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-400">Base Premium:</span>
@@ -334,11 +471,15 @@ export const ActionCenter = () => {
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-400">Risk Multiplier:</span>
-                    <span className="text-emerald-400 font-semibold">{quote.riskMultiplier}x</span>
+                    <span className="text-emerald-400 font-semibold">{quote.riskMultiplier.toFixed(2)}x</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-400">AI Confidence:</span>
-                    <span className="text-blue-400">{quote.confidence.toFixed(0)}%</span>
+                    <span className="text-gray-400">
+                      {aiAssessment ? 'AI Model:' : 'AI Confidence:'}
+                    </span>
+                    <span className="text-blue-400">
+                      {aiAssessment ? aiAssessment.aiModel : `${quote.confidence.toFixed(0)}%`}
+                    </span>
                   </div>
                 </div>
                 
@@ -349,7 +490,7 @@ export const ActionCenter = () => {
                     <div className="flex flex-wrap gap-1">
                       {quote.riskFactors.map((factor, idx) => (
                         <span key={idx} className="text-xs bg-yellow-500 bg-opacity-20 text-yellow-400 px-2 py-1 rounded">
-                          ⚡ {factor}
+                          {factor}
                         </span>
                       ))}
                     </div>
