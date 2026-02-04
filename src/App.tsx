@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Web3Provider } from './context/Web3Context';
 import { Dashboard } from './pages/Dashboard';
 import { Policies } from './pages/Policies';
+import { Docs } from './pages/Docs';
 import './index.css';
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/policies" element={<Policies />} />
+          <Route path="/docs" element={<Docs />} />
         </Routes>
       </Web3Provider>
     </BrowserRouter>

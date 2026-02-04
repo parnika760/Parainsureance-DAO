@@ -1,9 +1,17 @@
-import { ShoppingCart, AlertTriangle, DollarSign } from 'lucide-react';
+import { ShoppingCart, AlertTriangle, DollarSign, CheckCircle, Clock } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useWeb3 } from '../context/Web3Context';
 import { contractService } from '../services/contractService';
 import { oracleService } from '../services/oracleService';
 import { transactionService } from '../services/transactionService';
+
+interface ClaimInfo {
+  id: string;
+  name: string;
+  amount: string;
+  date: string;
+  status: 'claimed' | 'pending';
+}
 
 export const ActionCenter = () => {
   const { isConnected } = useWeb3();
@@ -12,6 +20,54 @@ export const ActionCenter = () => {
   const [location, setLocation] = useState('Sepolia Farm');
   const [policyActive, setPolicyActive] = useState(false);
   const [fundAmount, setFundAmount] = useState('0.5');
+  const [claimedPolicies, setClaimedPolicies] = useState<ClaimInfo[]>([]);
+  const [pendingClaims, setPendingClaims] = useState<ClaimInfo[]>([]);
+
+  // Load real claims when wallet connects
+  useEffect(() => {
+    if (isConnected) {
+      loadClaimsData();
+    } else {
+      setClaimedPolicies([]);
+      setPendingClaims([]);
+    }
+  }, [isConnected]);
+
+  const loadClaimsData = () => {
+    try {
+      transactionService.loadFromStorage();
+      
+      // Get payout transactions
+      const payoutTransactions = transactionService.getTransactionsByType('PayoutTriggered');
+      
+      const claimed: ClaimInfo[] = payoutTransactions
+        .filter(tx => tx.status === 'confirmed')
+        .map((tx, index) => ({
+          id: `#${8821 + index}`,
+          name: 'Weather Protection Policy',
+          amount: tx.amount + ' ETH',
+          date: new Date(tx.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+          status: 'claimed' as const
+        }));
+
+      const pending: ClaimInfo[] = payoutTransactions
+        .filter(tx => tx.status === 'pending')
+        .map((tx, index) => ({
+          id: `POL${index + 1}`,
+          name: 'Weather Protection Policy',
+          amount: tx.amount + ' ETH',
+          date: new Date(tx.timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+          status: 'pending' as const
+        }));
+
+      setClaimedPolicies(claimed);
+      setPendingClaims(pending);
+    } catch (error) {
+      console.error('Error loading claims:', error);
+      setClaimedPolicies([]);
+      setPendingClaims([]);
+    }
+  };
 
   useEffect(() => {
     const checkPolicyStatus = async () => {
@@ -339,6 +395,99 @@ export const ActionCenter = () => {
             '💰 Fund Pool'
           )}
         </button>
+      </div>
+
+      {/* Claimed & Pending Policies Section */}
+      <div className="glass-card">
+        <div className="flex items-center gap-3 mb-4">
+          <CheckCircle className="w-6 h-6 text-emerald-400" />
+          <h2 className="text-xl md:text-2xl font-bold">Claims Status</h2>
+        </div>
+
+        {!isConnected ? (
+          <div className="bg-dark-800 border border-gray-700 rounded-lg p-6 text-center">
+            <AlertTriangle className="w-8 h-8 text-yellow-400 mx-auto mb-3" />
+            <p className="text-gray-400">Connect your wallet to view claims</p>
+          </div>
+        ) : (
+          <>
+            <p className="text-gray-300 mb-4">
+              Track your claimed policies and pending payouts.
+            </p>
+
+            {/* Claimed Policies */}
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-emerald-400 mb-3 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5" />
+                Claimed Policies
+              </h3>
+              
+              {claimedPolicies.length > 0 ? (
+                <div className="space-y-2">
+                  {claimedPolicies.map((policy) => (
+                    <div key={policy.id} className="bg-dark-800 border border-emerald-400 border-opacity-30 rounded-lg p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-white">{policy.name}</p>
+                          <p className="text-xs text-gray-400 mt-1">Claimed on {policy.date}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-emerald-400">{policy.amount}</p>
+                          <span className="inline-block mt-1 px-2 py-1 bg-emerald-500 bg-opacity-20 text-emerald-300 text-xs font-semibold rounded">
+                            ✓ Claimed
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-dark-800 border border-emerald-400 border-opacity-20 rounded-lg p-4 text-center">
+                  <p className="text-gray-400 text-sm">No claimed policies yet</p>
+                </div>
+              )}
+            </div>
+
+            {/* About to be Claimed / Pending Claims */}
+            <div>
+              <h3 className="text-lg font-semibold text-yellow-400 mb-3 flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                Pending Claims
+              </h3>
+              
+              {pendingClaims.length > 0 ? (
+                <div className="space-y-2">
+                  {pendingClaims.map((claim) => (
+                    <div key={claim.id} className="bg-dark-800 border border-yellow-400 border-opacity-30 rounded-lg p-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-white">{claim.name}</p>
+                          <p className="text-xs text-gray-400 mt-1">Triggered on {claim.date}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-yellow-400">{claim.amount}</p>
+                          <span className="inline-block mt-1 px-2 py-1 bg-yellow-500 bg-opacity-20 text-yellow-300 text-xs font-semibold rounded">
+                            ⏳ Pending
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-dark-800 border border-yellow-400 border-opacity-20 rounded-lg p-4 text-center">
+                  <p className="text-gray-400 text-sm">No pending claims</p>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 p-3 bg-blue-500 bg-opacity-10 border border-blue-400 border-opacity-20 rounded-lg">
+              <p className="text-xs text-blue-300 text-center">
+                💡 Automatic payouts are processed when weather conditions trigger claim thresholds.
+              </p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

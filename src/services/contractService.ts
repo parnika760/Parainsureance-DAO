@@ -101,8 +101,31 @@ export class ContractService {
    */
   async requestPolicy(location: string): Promise<string> {
     try {
+      if (!this.provider) {
+        throw new Error('Provider not initialized. Please connect wallet first.');
+      }
+
+      // Check network
+      const network = await this.provider.getNetwork();
+      if (network.chainId !== 11155111n) { // Sepolia testnet chain ID
+        throw new Error(`Wrong network! You are on ${network.name} (${network.chainId}). Please switch to Sepolia Testnet (Chain ID: 11155111) in MetaMask.`);
+      }
+
       const contract = this.getContract();
-      const premium = await contract.PREMIUM();
+      
+      // Verify contract exists by checking code at address
+      const code = await this.provider.getCode(this.contractAddress);
+      if (code === '0x') {
+        throw new Error(`Contract not found at address ${this.contractAddress} on Sepolia Testnet. The contract may not be deployed on this network.`);
+      }
+
+      let premium;
+      try {
+        premium = await contract.PREMIUM();
+      } catch (premiumError) {
+        console.error('Error fetching premium:', premiumError);
+        throw new Error(`Failed to read contract PREMIUM. The contract at ${this.contractAddress} may not have the expected interface.`);
+      }
 
       const tx = await contract.requestPolicy(location, {
         value: premium,
@@ -110,10 +133,29 @@ export class ContractService {
       });
 
       const receipt = await tx.wait();
+      if (!receipt) {
+        throw new Error('Transaction failed or was cancelled');
+      }
       return receipt.hash;
     } catch (error) {
       console.error('Error requesting policy:', error);
-      throw error;
+      
+      // Provide user-friendly error messages
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      if (errorMessage.includes('Wrong network') || errorMessage.includes('Sepolia')) {
+        throw new Error(errorMessage); // Pass through as-is for network errors
+      } else if (errorMessage.includes('BAD_DATA') || errorMessage.includes('decode result')) {
+        throw new Error('Contract interface mismatch. The contract may not match the expected insurance contract ABI. Please ensure you are on Sepolia Testnet.');
+      } else if (errorMessage.includes('Contract not found') || errorMessage.includes('0x')) {
+        throw new Error(`Contract not deployed at address ${this.contractAddress} on Sepolia Testnet.`);
+      } else if (errorMessage.includes('insufficient funds')) {
+        throw new Error('Insufficient ETH in wallet to cover premium and gas fees.');
+      } else if (errorMessage.includes('user rejected')) {
+        throw new Error('Transaction was rejected by user in MetaMask.');
+      }
+      
+      throw new Error(errorMessage);
     }
   }
 

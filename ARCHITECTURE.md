@@ -69,19 +69,19 @@
 ```
 User                          UI                      Smart Contract
  │                             │                            │
- ├──> "Buy Policy"            │                            │
+ ├──> "Buy Policy"             │                            │
  │                             │                            │
- │                    ┌────────▼──────────┐               │
- │                    │ Set Location      │               │
- │                    │ Validate Input    │               │
- │                    └────────┬──────────┘               │
+ │                    ┌────────▼──────────┐                 │
+ │                    │ Set Location      │                 │
+ │                    │ Validate Input    │                 │
+ │                    └────────┬──────────┘                 │
  │                             │                            │
- │                             ├──> requestPolicy()  ──────▶│
+ │                             ├──> requestPolicy() ──────▶│
  │                             │                            │
- │   MetaMask Prompt◀──────────│                            │
+ │   MetaMask Prompt◀──────────│                           │
  │       (Confirm TX)          │                            │
  │   │                         │                            │
- │   └─────────────────────────┼──> (with 0.01 ETH)       │
+ │   └─────────────────────────┼──> (with 0.01 ETH)         │
  │                             │                            │
  │                             │      ┌─────────────────┐   │
  │                             │      │ Validate Payment│   │

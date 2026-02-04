@@ -48,11 +48,16 @@ export const Header = () => {
           >
             Policies
           </Link>
+          <Link
+            to="/docs"
+            className={`transition ${
+              isActive('/docs') ? 'text-emerald-400 font-semibold' : 'text-gray-300 hover:text-emerald-400'
+            }`}
+          >
+            Docs
+          </Link>
           <a href="#governance" className="text-gray-300 hover:text-emerald-400 transition">
             Governance
-          </a>
-          <a href="#docs" className="text-gray-300 hover:text-emerald-400 transition">
-            Docs
           </a>
         </nav>
 
@@ -107,11 +112,17 @@ export const Header = () => {
           >
             Policies
           </Link>
+          <Link
+            to="/docs"
+            onClick={() => setMobileMenuOpen(false)}
+            className={`transition ${
+              isActive('/docs') ? 'text-emerald-400 font-semibold' : 'text-gray-300 hover:text-emerald-400'
+            }`}
+          >
+            Docs
+          </Link>
           <a href="#governance" className="text-gray-300 hover:text-emerald-400 transition">
             Governance
-          </a>
-          <a href="#docs" className="text-gray-300 hover:text-emerald-400 transition">
-            Docs
           </a>
         </nav>
       )}
